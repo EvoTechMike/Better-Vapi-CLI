@@ -1,4 +1,4 @@
-# vapi-cli
+# better-vapi-cli (`bvapi`)
 
 Command-line interface for [Vapi](https://vapi.ai) voice AI — for humans and AI agents.
 
@@ -12,22 +12,22 @@ The Vapi MCP server can't return large payloads (full system prompts, full assis
 | assistant    | Phase 1 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | squad        | Phase 1 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | tool         | Phase 2 ⏳ | —                                     |
-| call         | Phase 3 ⏳ | —                                     |
-| phone-number | Phase 3 ⏳ | —                                     |
+| call         | Phase 3 ✅ | `list`, `get`, `create`, `update`, `delete` |
+| phone-number | Phase 3 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | file         | Phase 4 ⏳ | —                                     |
 | chat         | Phase 5 ⏳ | —                                     |
 | session      | Phase 5 ⏳ | —                                     |
 | campaign     | Phase 5 ⏳ | —                                     |
 | analytics    | Phase 5 ⏳ | —                                     |
 
-`vapi schema --json` is always the authoritative source for what's actually shipped in the binary you have.
+`bvapi schema --json` is always the authoritative source for what's actually shipped in the binary you have.
 
 ## Install
 
 ```bash
-npm i -g vapi-cli
+npm i -g better-vapi-cli
 # or run ad-hoc
-npx vapi-cli ...
+npx better-vapi-cli ...
 ```
 
 Requires Node 18+.
@@ -42,32 +42,32 @@ Pick one:
 # 1. Env var — overrides everything
 export VAPI_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
-# 2. Persisted file — stored at ~/.config/vapi-cli/credentials.json (mode 600)
-vapi auth login                        # interactive
-vapi auth login --key "$VAPI_API_KEY"  # scripted
-echo $VAPI_API_KEY | vapi auth login --no-input
+# 2. Persisted file — stored at ~/.config/bvapi/credentials.json (mode 600)
+bvapi auth login                        # interactive
+bvapi auth login --key "$VAPI_API_KEY"  # scripted
+echo $VAPI_API_KEY | bvapi auth login --no-input
 ```
 
 Verify:
 
 ```bash
-vapi auth status                       # source, redacted key, base URL
-vapi assistant list --limit 1
+bvapi auth status                       # source, redacted key, base URL
+bvapi assistant list --limit 1
 ```
 
 ## Use with Claude Code
 
-The skill at [`skills/vapi/SKILL.md`](skills/vapi/SKILL.md) tells Claude exactly how to drive this CLI — pulling system prompts, editing assistants with `jq`, building squads.
+The skill at [`skills/bvapi/SKILL.md`](skills/bvapi/SKILL.md) tells Claude exactly how to drive this CLI — pulling system prompts, editing assistants with `jq`, building squads.
 
 ```bash
 # 1. Install the CLI globally so Claude can run it
-npm i -g vapi-cli
+npm i -g better-vapi-cli
 
 # 2. Install the skill (uses the SKILL.md in this repo)
-npx skills add -g <owner>/vapi-cli
+npx skills add -g <owner>/better-vapi-cli
 
 # 3. Set your key once, in your shell rc or via:
-vapi auth login
+bvapi auth login
 ```
 
 After that, ask Claude things like *"show me the full system prompt for assistant abc-123"* or *"add a sentence to every assistant's system prompt"* — it will use the skill and `jq` instead of the truncating MCP server.
@@ -76,20 +76,20 @@ After that, ask Claude things like *"show me the full system prompt for assistan
 
 ```bash
 # Pull every assistant to disk, then jq locally
-vapi assistant list --out .vapi/assistants.json
+bvapi assistant list --out .vapi/assistants.json
 jq '[.[] | {id, name}]' .vapi/assistants.json
 
 # Full untruncated system prompt
-vapi assistant get $ID | jq -r '.model.messages[]? | select(.role=="system") | .content'
+bvapi assistant get $ID | jq -r '.model.messages[]? | select(.role=="system") | .content'
 
 # Edit an assistant
-vapi assistant get $ID --out /tmp/a.json
+bvapi assistant get $ID --out /tmp/a.json
 jq '.model.messages |= map(if .role=="system" then .content="NEW" else . end)' /tmp/a.json \
-  | vapi assistant update $ID -f -
+  | bvapi assistant update $ID -f -
 
 # Always preview destructive changes
-echo '{"name":"x"}' | vapi assistant create -f - --dry-run
-vapi assistant delete $ID --force
+echo '{"name":"x"}' | bvapi assistant create -f - --dry-run
+bvapi assistant delete $ID --force
 ```
 
 ## Output modes
@@ -113,7 +113,7 @@ By default, JSON to stdout (pretty in a TTY, compact when piped). Other modes:
 | `VAPI_API_KEY` | Private API key (overrides credentials file). |
 | `VAPI_ORG_ID` | Optional org id, threaded through env-based config. |
 | `VAPI_BASE_URL` | Override base URL (default `https://api.vapi.ai`). |
-| `VAPI_CONFIG_DIR` | Override config dir (default `~/.config/vapi-cli`). |
+| `VAPI_CONFIG_DIR` | Override config dir (default `~/.config/bvapi`). |
 
 ## Development
 

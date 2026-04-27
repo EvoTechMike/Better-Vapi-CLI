@@ -2,6 +2,8 @@ import { Command } from "commander";
 
 import { buildAssistantCommand } from "./commands/assistant.js";
 import { buildAuthCommand } from "./commands/auth.js";
+import { buildCallCommand } from "./commands/call.js";
+import { buildPhoneNumberCommand } from "./commands/phone-number.js";
 import { buildSquadCommand } from "./commands/squad.js";
 import { CliError, EXIT, EXIT_DESCRIPTIONS } from "./exit-codes.js";
 import { addGlobalFlags } from "./global-flags.js";
@@ -14,7 +16,7 @@ function buildProgram(): Command {
   const program = new Command();
 
   program
-    .name("vapi")
+    .name("bvapi")
     .description(
       "CLI for Vapi voice AI. Pipe JSON to jq, redirect to disk for large payloads.",
     )
@@ -32,10 +34,12 @@ function buildProgram(): Command {
   program.addCommand(buildAuthCommand());
   program.addCommand(buildAssistantCommand());
   program.addCommand(buildSquadCommand());
+  program.addCommand(buildCallCommand());
+  program.addCommand(buildPhoneNumberCommand());
 
   addGlobalFlags(program.command("schema [path...]"))
     .description(
-      "Print the CLI command tree as JSON. Optional path narrows to a subcommand, e.g. `vapi schema assistant get`.",
+      "Print the CLI command tree as JSON. Optional path narrows to a subcommand, e.g. `bvapi schema assistant get`.",
     )
     .action((parts: string[], _opts, command: Command) => {
       const globals = command.opts<GlobalFlags>();

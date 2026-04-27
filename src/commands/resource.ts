@@ -13,8 +13,8 @@ export interface ResourceConfig {
   apiPath: string;
   /** Human description for the parent command */
   description: string;
-  /** Query params accepted by `list`, registered as flags */
-  listQueryFlags?: { flag: string; description: string }[];
+  /** Extra `list` filters: each entry registers a Commander option AND maps it to a query-string key. */
+  listQueryFlags?: { flag: string; description: string; query: string }[];
 }
 
 interface ListOpts {
@@ -32,34 +32,51 @@ export function buildResourceCommand(cfg: ResourceConfig): Command {
   const list = addGlobalFlags(root.command("list"))
     .description(`List ${cfg.name}s (GET /${cfg.apiPath}). Returns an array.`)
     .option("-l, --limit <n>", "Maximum number of records to return")
-    .option("--created-at-gt <iso>", "Created after (ISO 8601)")
-    .option("--created-at-lt <iso>", "Created before (ISO 8601)")
-    .option("--updated-at-gt <iso>", "Updated after (ISO 8601)")
-    .option("--updated-at-lt <iso>", "Updated before (ISO 8601)")
-    .action(async (opts: ListOpts, command: Command) => {
-      const globals = command.optsWithGlobals<GlobalFlags & ListOpts>();
-      const query = filterQuery({
-        limit: opts.limit,
-        createdAtGt: globals["createdAtGt"],
-        createdAtLt: globals["createdAtLt"],
-        updatedAtGt: globals["updatedAtGt"],
-        updatedAtLt: globals["updatedAtLt"],
-      });
-      if (globals.dryRun) {
-        emit(planRequest("GET", `/${cfg.apiPath}`, { query }), globals);
-        return;
-      }
-      const auth = resolveAuth();
-      const data = await vapiFetch<unknown[]>("GET", `/${cfg.apiPath}`, {
-        apiKey: auth.apiKey,
-        query,
-      });
-      emit(data, { ...globals, emptyExit: true });
-    });
+    .option("--created-at-gt <iso>", "Created after (ISO 8601, exclusive)")
+    .option("--created-at-lt <iso>", "Created before (ISO 8601, exclusive)")
+    .option("--created-at-ge <iso>", "Created on or after (ISO 8601, inclusive)")
+    .option("--created-at-le <iso>", "Created on or before (ISO 8601, inclusive)")
+    .option("--updated-at-gt <iso>", "Updated after (ISO 8601, exclusive)")
+    .option("--updated-at-lt <iso>", "Updated before (ISO 8601, exclusive)")
+    .option("--updated-at-ge <iso>", "Updated on or after (ISO 8601, inclusive)")
+    .option("--updated-at-le <iso>", "Updated on or before (ISO 8601, inclusive)");
 
   for (const extra of cfg.listQueryFlags ?? []) {
     list.addOption(new Option(extra.flag, extra.description));
   }
+
+  list.action(async (opts: ListOpts, command: Command) => {
+    const globals = command.optsWithGlobals<GlobalFlags & ListOpts>();
+    const query: Record<string, string | number | undefined> = {
+      limit: opts.limit,
+      createdAtGt: globals["createdAtGt"],
+      createdAtLt: globals["createdAtLt"],
+      createdAtGe: globals["createdAtGe"],
+      createdAtLe: globals["createdAtLe"],
+      updatedAtGt: globals["updatedAtGt"],
+      updatedAtLt: globals["updatedAtLt"],
+      updatedAtGe: globals["updatedAtGe"],
+      updatedAtLe: globals["updatedAtLe"],
+    };
+    for (const extra of cfg.listQueryFlags ?? []) {
+      const attr = attrName(extra.flag);
+      const val = (globals as Record<string, unknown>)[attr];
+      if (typeof val === "string" || typeof val === "number") {
+        query[extra.query] = val;
+      }
+    }
+    const filtered = filterQuery(query);
+    if (globals.dryRun) {
+      emit(planRequest("GET", `/${cfg.apiPath}`, { query: filtered }), globals);
+      return;
+    }
+    const auth = resolveAuth();
+    const data = await vapiFetch<unknown[]>("GET", `/${cfg.apiPath}`, {
+      apiKey: auth.apiKey,
+      query: filtered,
+    });
+    emit(data, { ...globals, emptyExit: true });
+  });
 
   addGlobalFlags(root.command("get"))
     .argument("<id>", `${cfg.name} id`)
@@ -142,4 +159,10 @@ function filterQuery(
     out[k] = v;
   }
   return out;
+}
+
+function attrName(flag: string): string {
+  const long = flag.split(/[\s,]+/).find((s) => s.startsWith("--"));
+  if (!long) throw new Error(`listQueryFlags: no long flag in "${flag}"`);
+  return long.replace(/^--/, "").replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }

@@ -2,7 +2,7 @@ import { Command, Option } from "commander";
 
 /**
  * Commander only matches options at the level they are declared. To let users
- * type `vapi <cmd> --json --out path`, every leaf command has to repeat the
+ * type `bvapi <cmd> --json --out path`, every leaf command has to repeat the
  * global flag set. Calling this on a subcommand keeps that ergonomic without
  * forcing parent-first ordering.
  */

@@ -34,7 +34,7 @@ export async function vapiFetch<T = unknown>(
   const url = buildUrl(resourcePath, opts.query, opts.baseUrl);
   const headers: Record<string, string> = {
     Authorization: `Bearer ${opts.apiKey}`,
-    "User-Agent": `vapi-cli/${VERSION}`,
+    "User-Agent": `bvapi/${VERSION}`,
     Accept: "application/json",
   };
   const init: RequestInit = { method, headers };
