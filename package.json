@@ -1,0 +1,43 @@
+{
+  "name": "vapi-cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for Vapi voice AI — for humans and AI agents.",
+  "type": "module",
+  "bin": {
+    "vapi": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "vapi",
+    "voice-ai",
+    "cli",
+    "claude",
+    "claude-code",
+    "skill",
+    "agent"
+  ],
+  "license": "MIT"
+}
