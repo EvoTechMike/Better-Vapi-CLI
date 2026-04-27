@@ -70,7 +70,7 @@ npx skills add -g <owner>/better-vapi-cli
 bvapi auth login
 ```
 
-After that, ask Claude things like *"show me the full system prompt for assistant abc-123"* or *"add a sentence to every assistant's system prompt"* — it will use the skill and `jq` instead of the truncating MCP server.
+After that, ask Claude things like *"show me the full system prompt for assistant abc-123"*, *"find all failed calls in the last day and tell me which assistants handled them"*, or *"add a sentence to every assistant's system prompt"* — it will use the skill and `jq` instead of the truncating MCP server.
 
 ## Quick examples
 
@@ -90,6 +90,20 @@ jq '.model.messages |= map(if .role=="system" then .content="NEW" else . end)' /
 # Always preview destructive changes
 echo '{"name":"x"}' | bvapi assistant create -f - --dry-run
 bvapi assistant delete $ID --force
+
+# Investigate call logs — full untruncated transcripts
+bvapi call list --limit 20 --select id,status,endedReason,cost,assistantId,phoneNumberId --plain
+bvapi call get $CALL_ID --out /tmp/c.json
+jq -r '.messages[] | "\(.role): \(.message // "")"' /tmp/c.json
+
+# Filter calls by assistant + window, find failures
+bvapi call list --assistant-id $A --created-at-gt 2026-04-20T00:00:00Z
+bvapi call list --created-at-gt $(date -u -d '1 day ago' +%FT%TZ) --out /tmp/c.json
+jq '[.[] | select((.endedReason // "") | test("error|failed";"i"))]' /tmp/c.json
+
+# Resolve a call's phoneNumberId back to the owning assistant/squad
+PHONE=$(bvapi call get $CALL_ID | jq -r '.phoneNumberId')
+bvapi phone-number get $PHONE | jq '{number, name, assistantId, squadId}'
 ```
 
 ## Output modes
@@ -121,8 +135,12 @@ By default, JSON to stdout (pretty in a TTY, compact when piped). Other modes:
 npm install
 npm run build         # tsup → dist/cli.js
 npm run typecheck
-npm test              # vitest
+npm test              # vitest (mocked fetch — never hits the real API)
 node dist/cli.js --help
+
+# Live dev loop: auto-rebuild on save + globally linked binary
+npm link              # makes `bvapi` on PATH point at this dist
+npm run dev           # tsup --watch
 ```
 
 ## License
