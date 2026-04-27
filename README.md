@@ -11,7 +11,7 @@ The Vapi MCP server can't return large payloads (full system prompts, full assis
 | auth         | Phase 1 ✅ | `login`, `status`, `logout`           |
 | assistant    | Phase 1 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | squad        | Phase 1 ✅ | `list`, `get`, `create`, `update`, `delete` |
-| tool         | Phase 2 ⏳ | —                                     |
+| tool         | Phase 2 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | call         | Phase 3 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | phone-number | Phase 3 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | file         | Phase 4 ⏳ | —                                     |
@@ -104,6 +104,10 @@ jq '[.[] | select((.endedReason // "") | test("error|failed";"i"))]' /tmp/c.json
 # Resolve a call's phoneNumberId back to the owning assistant/squad
 PHONE=$(bvapi call get $CALL_ID | jq -r '.phoneNumberId')
 bvapi phone-number get $PHONE | jq '{number, name, assistantId, squadId}'
+
+# List every tool, then pull one's full function schema
+bvapi tool list --select id,type,function.name --plain
+bvapi tool get $TOOL_ID | jq '.function'
 ```
 
 ## Output modes

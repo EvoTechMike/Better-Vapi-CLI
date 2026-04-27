@@ -131,6 +131,32 @@ PHONE_ID=$(bvapi call get $CALL_ID | jq -r '.phoneNumberId')
 bvapi phone-number get $PHONE_ID | jq '{number, name, assistantId, squadId}'
 ```
 
+## tool
+
+Tools are the function schemas / transferCall / apiRequest definitions that
+assistants invoke mid-call. Pull them with `tool get <id>` for the full,
+untruncated function schema.
+
+| Command | Endpoint | Notes |
+|---------|----------|-------|
+| `bvapi tool list [--limit N] [--created-at-{gt,lt,ge,le} ISO] [--updated-at-{gt,lt,ge,le} ISO]` | `GET /tool` | Returns array. Empty → exit `3`. |
+| `bvapi tool get <id>` | `GET /tool/{id}` | Full untruncated definition. |
+| `bvapi tool create -f <file\|->` | `POST /tool` | Body required. |
+| `bvapi tool update <id> -f <file\|->` | `PATCH /tool/{id}` | Partial. |
+| `bvapi tool delete <id> [--force]` | `DELETE /tool/{id}` | `--force` required outside dry-run. |
+
+```bash
+# Inventory of tools by type
+bvapi tool list --select id,type --plain
+
+# Full function schema for one tool
+bvapi tool get $TOOL_ID | jq '.function'
+
+# Find every assistant that references a given tool id
+bvapi assistant list --out /tmp/a.json
+jq --arg t "$TOOL_ID" '[.[] | select((.model.toolIds // []) | index($t)) | {id,name}]' /tmp/a.json
+```
+
 ## schema
 
 ```bash
@@ -156,7 +182,7 @@ Returns a map of `NAME → {code, description}`.
 | auth         | Phase 1 ✅    | login, status, logout |
 | assistant    | Phase 1 ✅    | list, get, create, update, delete |
 | squad        | Phase 1 ✅    | list, get, create, update, delete |
-| tool         | Phase 2 ⏳    | — |
+| tool         | Phase 2 ✅    | list, get, create, update, delete |
 | call         | Phase 3 ✅    | list, get, create, update, delete |
 | phone-number | Phase 3 ✅    | list, get, create, update, delete |
 | file         | Phase 4 ⏳    | — |

@@ -5,6 +5,7 @@ import { buildAuthCommand } from "./commands/auth.js";
 import { buildCallCommand } from "./commands/call.js";
 import { buildPhoneNumberCommand } from "./commands/phone-number.js";
 import { buildSquadCommand } from "./commands/squad.js";
+import { buildToolCommand } from "./commands/tool.js";
 import { CliError, EXIT, EXIT_DESCRIPTIONS } from "./exit-codes.js";
 import { addGlobalFlags } from "./global-flags.js";
 import { emit, type GlobalFlags } from "./output.js";
@@ -36,6 +37,7 @@ function buildProgram(): Command {
   program.addCommand(buildSquadCommand());
   program.addCommand(buildCallCommand());
   program.addCommand(buildPhoneNumberCommand());
+  program.addCommand(buildToolCommand());
 
   addGlobalFlags(program.command("schema [path...]"))
     .description(

@@ -115,6 +115,7 @@ describe("CLI wiring", () => {
         "squad",
         "call",
         "phone-number",
+        "tool",
         "schema",
         "exit-codes",
       ]),
@@ -181,6 +182,36 @@ describe("CLI wiring", () => {
     await run(["phone-number", "get", "p1", "--json"]);
     expect(fetchMock.mock.calls[0]![0]).toBe("https://api.vapi.ai/phone-number/p1");
     expect(JSON.parse(lastStdout())).toMatchObject({ id: "p1" });
+    delete process.env.VAPI_API_KEY;
+  });
+
+  it("tool list --dry-run prints planned GET", async () => {
+    await run(["tool", "list", "--limit", "2", "--dry-run", "--json"]);
+    expect(JSON.parse(lastStdout())).toEqual({
+      method: "GET",
+      url: "https://api.vapi.ai/tool?limit=2",
+      body: null,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("tool get hits /tool/{id} with bearer auth", async () => {
+    process.env.VAPI_API_KEY = "test-key";
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "t1", type: "function" }), { status: 200 }),
+    );
+    await run(["tool", "get", "t1", "--json"]);
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://api.vapi.ai/tool/t1");
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(init.headers).toMatchObject({ Authorization: "Bearer test-key" });
+    expect(JSON.parse(lastStdout())).toMatchObject({ id: "t1" });
+    delete process.env.VAPI_API_KEY;
+  });
+
+  it("tool delete without --force exits 2", async () => {
+    process.env.VAPI_API_KEY = "test-key";
+    await expect(run(["tool", "delete", "t1"])).rejects.toThrow("__exit:2");
+    expect(fetchMock).not.toHaveBeenCalled();
     delete process.env.VAPI_API_KEY;
   });
 
