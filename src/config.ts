@@ -19,7 +19,7 @@ export function configDir(): string {
   if (process.env.VAPI_CONFIG_DIR) return process.env.VAPI_CONFIG_DIR;
   const xdg = process.env.XDG_CONFIG_HOME;
   const base = xdg && xdg.length > 0 ? xdg : path.join(os.homedir(), ".config");
-  return path.join(base, "vapi-cli");
+  return path.join(base, "bvapi");
 }
 
 export function credentialsPath(): string {
@@ -71,7 +71,7 @@ export function resolveAuth(): ResolvedAuth {
   if (file) return { apiKey: file.apiKey, orgId: file.orgId, source: "file" };
   throw new CliError(
     EXIT.AUTH,
-    "No Vapi API key configured. Set VAPI_API_KEY or run `vapi auth login`.",
+    "No Vapi API key configured. Set VAPI_API_KEY or run `bvapi auth login`.",
   );
 }
 

@@ -19,7 +19,7 @@ export function buildAuthCommand(): Command {
   const cmd = new Command("auth").description("Manage Vapi credentials");
 
   addGlobalFlags(cmd.command("login"))
-    .description("Save a Vapi private API key to ~/.config/vapi-cli/credentials.json")
+    .description("Save a Vapi private API key to ~/.config/bvapi/credentials.json")
     .option("--key <key>", "API key (else read from stdin)")
     .option("--org-id <id>", "Optional Vapi organization ID")
     .action(async (opts: { key?: string; orgId?: string }, command: Command) => {

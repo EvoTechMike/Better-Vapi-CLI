@@ -1,10 +1,10 @@
 {
-  "name": "vapi-cli",
+  "name": "better-vapi-cli",
   "version": "0.1.0",
-  "description": "Command-line interface for Vapi voice AI — for humans and AI agents.",
+  "description": "Command-line interface for Vapi voice AI — for humans and AI agents. Installs the `bvapi` binary.",
   "type": "module",
   "bin": {
-    "vapi": "./dist/cli.js"
+    "bvapi": "./dist/cli.js"
   },
   "files": [
     "dist",
