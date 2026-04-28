@@ -88,6 +88,20 @@ bvapi assistant update $ID -f /tmp/a.patch.json              # apply
 
 When `--out` is set, stdout gets `{"path":"<resolved>"}` (so you can chain) and the JSON goes to the file.
 
+## Bulk scans: delegate to a sub-agent
+
+`--out` keeps the *raw* JSON out of context — only the path lands in stdout. But running a wide `jq` in the main session still pipes every match back in. For scans across many entities (e.g. *"every assistant whose system prompt mentions refund"*, *"every failed call last week"*), spawn a sub-agent via the Task/Agent tool, hand it the on-disk path, and ask for a narrow summary. The agent runs `jq` locally; only the answer enters the main context.
+
+```bash
+# Pull once, write to disk
+bvapi assistant list --out /tmp/a.json
+# Then dispatch a sub-agent with a prompt like:
+#   "Read /tmp/a.json — return id+name of any assistant whose system
+#    prompt mentions 'refund'. Just the matches, no extra output."
+```
+
+Rule of thumb: if the `jq` output would exceed a screenful or you're iterating across more than a handful of records, delegate. For `.[0].name` or a single-record `get`, don't bother.
+
 ## Common Patterns
 
 ```bash
