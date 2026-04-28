@@ -64,7 +64,7 @@ The skill at [`skills/bvapi/SKILL.md`](skills/bvapi/SKILL.md) tells Claude exact
 npm i -g better-vapi-cli
 
 # 2. Install the skill (uses the SKILL.md in this repo)
-npx skills add -g <owner>/better-vapi-cli
+npx skills add -g EvoTechMike/Better-Vapi-CLI
 
 # 3. Set your key once, in your shell rc or via:
 bvapi auth login
