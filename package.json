@@ -4,7 +4,7 @@
   "description": "Command-line interface for Vapi voice AI — for humans and AI agents. Installs the `bvapi` binary.",
   "type": "module",
   "bin": {
-    "bvapi": "./dist/cli.js"
+    "bvapi": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -14,12 +14,24 @@
   "engines": {
     "node": ">=18"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EvoTechMike/Better-Vapi-CLI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/EvoTechMike/Better-Vapi-CLI/issues"
+  },
+  "homepage": "https://github.com/EvoTechMike/Better-Vapi-CLI#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "commander": "^12.1.0"
