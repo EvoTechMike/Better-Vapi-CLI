@@ -72,6 +72,24 @@ bvapi auth login
 
 After that, ask Claude things like *"show me the full system prompt for assistant abc-123"*, *"find all failed calls in the last day and tell me which assistants handled them"*, or *"add a sentence to every assistant's system prompt"* — it will use the skill and `jq` instead of the truncating MCP server.
 
+## Updating
+
+```bash
+# What you have vs what's on the registry
+bvapi --version
+npm view better-vapi-cli version
+
+# CLI
+npm i -g better-vapi-cli@latest          # upgrade the global install
+# (npx better-vapi-cli@latest ...        # always pulls latest for one-off use)
+
+# Skill (only if installed via `npx skills add`)
+npx skills update -g bvapi               # just bvapi
+npx skills update -g                     # every globally-installed skill
+```
+
+The skill is sourced from the `master` branch of [`EvoTechMike/Better-Vapi-CLI`](https://github.com/EvoTechMike/Better-Vapi-CLI), independent of npm's publish cadence — so `npx skills update` picks up skill-only edits (new guidance, command reference tweaks) without the CLI needing a new version, and vice versa.
+
 ## Quick examples
 
 ```bash
