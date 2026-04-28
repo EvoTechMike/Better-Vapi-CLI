@@ -1,7 +1,7 @@
 import { CliError, EXIT, type ExitCode } from "./exit-codes.js";
 import { baseUrl as defaultBaseUrl } from "./config.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 export interface VapiFetchOptions {
   apiKey: string;
@@ -24,6 +24,51 @@ export function planRequest(
 ): PlannedRequest {
   const url = buildUrl(resourcePath, opts.query, opts.baseUrl);
   return { method, url, body: opts.body ?? null };
+}
+
+export interface VapiUploadOptions {
+  apiKey: string;
+  formData: FormData;
+  baseUrl?: string;
+  retry?: boolean;
+}
+
+export function planUpload(
+  method: string,
+  resourcePath: string,
+  opts: { fields: Record<string, string | number>; baseUrl?: string },
+): PlannedRequest {
+  const url = buildUrl(resourcePath, undefined, opts.baseUrl);
+  return { method, url, body: { multipart: opts.fields } };
+}
+
+export async function vapiUpload<T = unknown>(
+  method: string,
+  resourcePath: string,
+  opts: VapiUploadOptions,
+): Promise<T> {
+  const url = buildUrl(resourcePath, undefined, opts.baseUrl);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${opts.apiKey}`,
+    "User-Agent": `bvapi/${VERSION}`,
+    Accept: "application/json",
+  };
+  // Intentionally do NOT set Content-Type — fetch/undici fills in the
+  // multipart boundary for us when body is a FormData.
+  const init: RequestInit = { method, headers, body: opts.formData };
+
+  const shouldRetry = opts.retry !== false;
+  const res = await doFetch(url, init, shouldRetry);
+
+  if (res.status === 204) return undefined as T;
+
+  const text = await res.text();
+  const data = text.length > 0 ? safeJson(text) : undefined;
+
+  if (!res.ok) {
+    throw new CliError(statusToExit(res.status), formatHttpError(method, url, res.status, data, text));
+  }
+  return data as T;
 }
 
 export async function vapiFetch<T = unknown>(

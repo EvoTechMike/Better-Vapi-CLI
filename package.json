@@ -1,6 +1,6 @@
 {
   "name": "better-vapi-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Command-line interface for Vapi voice AI — for humans and AI agents. Installs the `bvapi` binary.",
   "type": "module",
   "bin": {

@@ -15,6 +15,8 @@ export interface ResourceConfig {
   description: string;
   /** Extra `list` filters: each entry registers a Commander option AND maps it to a query-string key. */
   listQueryFlags?: { flag: string; description: string; query: string }[];
+  /** Skip the default JSON `create` subcommand — caller will register their own (e.g. multipart upload). */
+  skipCreate?: boolean;
 }
 
 interface ListOpts {
@@ -94,21 +96,23 @@ export function buildResourceCommand(cfg: ResourceConfig): Command {
       emit(data, globals);
     });
 
-  addGlobalFlags(root.command("create"))
-    .description(`Create ${cfg.name} (POST /${cfg.apiPath}). Body via -f <file|->`)
-    .requiredOption("-f, --file <path>", "JSON body file (use - for stdin)")
-    .action(async (opts: FileOpts, command: Command) => {
-      const globals = command.optsWithGlobals<GlobalFlags>();
-      if (!opts.file) throw new CliError(EXIT.USAGE, "--file is required");
-      const body = readBodyFromFlag(opts.file);
-      if (globals.dryRun) {
-        emit(planRequest("POST", `/${cfg.apiPath}`, { body }), globals);
-        return;
-      }
-      const auth = resolveAuth();
-      const data = await vapiFetch("POST", `/${cfg.apiPath}`, { apiKey: auth.apiKey, body });
-      emit(data, globals);
-    });
+  if (!cfg.skipCreate) {
+    addGlobalFlags(root.command("create"))
+      .description(`Create ${cfg.name} (POST /${cfg.apiPath}). Body via -f <file|->`)
+      .requiredOption("-f, --file <path>", "JSON body file (use - for stdin)")
+      .action(async (opts: FileOpts, command: Command) => {
+        const globals = command.optsWithGlobals<GlobalFlags>();
+        if (!opts.file) throw new CliError(EXIT.USAGE, "--file is required");
+        const body = readBodyFromFlag(opts.file);
+        if (globals.dryRun) {
+          emit(planRequest("POST", `/${cfg.apiPath}`, { body }), globals);
+          return;
+        }
+        const auth = resolveAuth();
+        const data = await vapiFetch("POST", `/${cfg.apiPath}`, { apiKey: auth.apiKey, body });
+        emit(data, globals);
+      });
+  }
 
   addGlobalFlags(root.command("update"))
     .argument("<id>", `${cfg.name} id`)

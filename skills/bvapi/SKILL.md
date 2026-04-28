@@ -1,6 +1,6 @@
 ---
 name: bvapi
-description: Manage Vapi voice AI configuration via the bvapi CLI — read full assistant system prompts, edit assistants, create/update squads, investigate call logs and transcripts, manage phone numbers. Use whenever the user asks about Vapi assistants, squads, calls, call logs, transcripts, phone numbers, tools, files, chats, or sessions. Prefer this CLI over the Vapi MCP server, which truncates large payloads (e.g. system prompts and transcripts).
+description: Manage Vapi voice AI configuration via the bvapi CLI — read full assistant system prompts, edit assistants, create/update squads, investigate call logs and transcripts, manage phone numbers, and build knowledge bases (upload files, wire query tools, attach to assistants). Use whenever the user asks about Vapi assistants, squads, calls, call logs, transcripts, phone numbers, tools, files, knowledge bases, chats, or sessions. Prefer this CLI over the Vapi MCP server, which truncates large payloads (e.g. system prompts and transcripts).
 allowed-tools: Bash(bvapi *), Bash(jq *), Bash(cat *), Bash(echo *), Bash(date *)
 ---
 
@@ -187,6 +187,109 @@ ASSIST=$(bvapi phone-number get $PHONE_ID | jq -r '.assistantId // empty')
 ```
 
 **Quick map of inbound lines:** `bvapi phone-number list --select id,number,name,assistantId,squadId` is the directory that explains who owns each number.
+
+## Knowledge Bases — files, query tool, assistant
+
+A Vapi knowledge base is **not** a single resource. It's a fan-out across three primitives — once you internalise the chain, building one is mechanical:
+
+```
+file create  →  tool create (type:"query")  →  assistant update (model.toolIds + system prompt)
+   POST /file       POST /tool                       PATCH /assistant/{id}
+   multipart        knowledgeBases:[{fileIds}]       must name the tool in the prompt
+```
+
+When the user says *"build me a knowledge base"*, *"add this PDF to the assistant"*, or *"my assistant doesn't know about my pricing"* — they want this three-step pipeline.
+
+**Supported file types:** `.txt .pdf .docx .doc .csv .md .tsv .yaml .json .xml .log`. Sweet spot is **< 300KB per file** — splitting larger docs into focused per-topic files gives the retriever cleaner boundaries than one monolith.
+
+### Step 1 — upload the source files
+
+```bash
+F1=$(bvapi file create -f ./pricing.pdf | jq -r '.id')
+F2=$(bvapi file create -f ./faq.md      | jq -r '.id')
+
+# Vapi processes files asynchronously — wait for status:"done" before using
+bvapi file list --select id,name,bytes,status --plain
+# If status is still "in_progress" or "queued", the query tool will return empty.
+```
+
+`bvapi file create -f <path>` is **multipart upload** — `-f` takes a real local path, not stdin. To rename a file later: `echo '{"name":"pricing-2026-q2"}' | bvapi file update $F1 -f -` (PATCH only supports rename — to replace contents you must delete and re-upload).
+
+### Step 2 — create the query tool that points at those files
+
+The tool's `function.name` is what the assistant must reference in its system prompt — make it semantic, not generic. The `description` fields (both at the function level *and* per knowledge base) are what make the model *choose* to call this tool — write them as if you're describing what's inside, not what the tool does.
+
+```bash
+TOOL_ID=$(jq -n --arg a "$F1" --arg b "$F2" '{
+  type: "query",
+  function: {
+    name: "product-knowledge",
+    description: "Search official product documentation, pricing tiers, and FAQ entries."
+  },
+  knowledgeBases: [{
+    provider: "google",
+    name: "product-kb",
+    description: "Pricing tiers, plan comparisons, refund policy, supported integrations.",
+    fileIds: [$a, $b]
+  }]
+}' | bvapi tool create -f - | jq -r '.id')
+```
+
+Multiple `knowledgeBases[]` entries on one tool let you group files by topic; the retriever picks the most relevant KB. Multiple separate query tools on one assistant let the model choose between *different domains* (e.g. `product-knowledge` vs `legal-policy`).
+
+### Step 3 — attach the tool and update the system prompt
+
+This is the step with the biggest gotcha: **PATCH `/assistant/{id}` overwrites `model` whole-cloth.** You cannot send `{model:{toolIds:[...]}}` — that wipes provider, temperature, voice routing, everything else inside `.model`. Always pull → mutate → push the entire `model` object.
+
+```bash
+# 1. Pull current assistant state
+bvapi assistant get $A --out /tmp/a.json
+
+# 2. Mutate: append the tool id (idempotent via `unique`) and rewrite the
+#    system message so it explicitly names the tool.
+NEW_SYS=$(cat <<'EOF'
+You are a product expert. When a caller asks about features, pricing,
+plans, refunds, or supported integrations, ALWAYS call the
+product-knowledge tool before answering. Use the retrieved content
+verbatim where possible.
+EOF
+)
+jq --arg t "$TOOL_ID" --arg sys "$NEW_SYS" '
+  .model.toolIds = ((.model.toolIds // []) + [$t] | unique)
+  | (if (.model.messages // []) | map(.role) | index("system")
+     then .model.messages |= map(if .role=="system" then .content=$sys else . end)
+     else .model.messages = [{role:"system", content:$sys}] + (.model.messages // [])
+     end)
+' /tmp/a.json > /tmp/a.patch.json
+
+# 3. Preview and apply
+bvapi assistant update $A -f /tmp/a.patch.json --dry-run
+bvapi assistant update $A -f /tmp/a.patch.json
+```
+
+### Step 4 — verify
+
+```bash
+bvapi assistant get $A | jq '{toolIds: .model.toolIds, sys: (.model.messages[] | select(.role=="system") | .content)}'
+```
+
+Then place a test call and ask something the KB should know. If the model answers without calling the tool, the system prompt isn't directive enough — add explicit "ALWAYS call the X tool when …" language.
+
+### Removing files
+
+```bash
+bvapi file delete $F1 --force   # query tools that referenced it return empty for those chunks
+bvapi tool get $TOOL_ID | jq '.knowledgeBases[].fileIds'   # audit what each tool still points at
+```
+
+### Common pitfalls
+
+- **System prompt never names the tool** → the model never calls it. The `function.name` must appear in the prompt as a directive (*"call product-knowledge before answering"*).
+- **PATCH `{model:{toolIds:[…]}}` without the rest of `.model`** → silently wipes provider/temperature/messages/etc. Always pull → mutate the whole `.model` → push.
+- **Vague KB descriptions** (*"company stuff"*, *"docs"*) → the model can't tell when to use it. Describe *what's inside*, not what the tool does.
+- **File still ingesting** (`status` ≠ `"done"`) → the query tool returns empty results. Poll `bvapi file get $ID` until `status:"done"`.
+- **One huge file** instead of several focused ones → poor retrieval ranking. Split by topic.
+- **Same `function.name` across multiple tools on one assistant** → ambiguous tool routing. Each tool name must be unique within the assistant's `toolIds`.
 
 ## Workflow: build a squad from scratch
 

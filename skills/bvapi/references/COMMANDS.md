@@ -157,6 +157,32 @@ bvapi assistant list --out /tmp/a.json
 jq --arg t "$TOOL_ID" '[.[] | select((.model.toolIds // []) | index($t)) | {id,name}]' /tmp/a.json
 ```
 
+## file
+
+Files are knowledge-base sources. Upload them, then reference their `id` from a `tool` of `type:"query"`. `create` is **multipart** (no stdin) and `update` only renames; replacing content means delete + re-upload.
+
+| Command | Endpoint | Notes |
+|---------|----------|-------|
+| `bvapi file list [--limit N] [--created-at-{gt,lt,ge,le} ISO] [--updated-at-{gt,lt,ge,le} ISO]` | `GET /file` | Returns array. Empty → exit `3`. |
+| `bvapi file get <id>` | `GET /file/{id}` | Includes `status` (poll until `"done"`). |
+| `bvapi file create -f <path>` | `POST /file` | **Multipart upload** of a real local file (`.pdf .docx .txt .md .csv .json .yaml .xml .log .doc .tsv`). Sweet spot < 300KB per file. |
+| `bvapi file update <id> -f <file\|->` | `PATCH /file/{id}` | Body `{name: string}` only — rename. Cannot replace contents. |
+| `bvapi file delete <id> [--force]` | `DELETE /file/{id}` | Query tools that reference this file return empty for its chunks afterwards. |
+
+```bash
+# Upload, then check ingestion status
+F1=$(bvapi file create -f ./pricing.pdf | jq -r '.id')
+bvapi file get $F1 | jq '{name, bytes, status}'   # wait for status:"done"
+
+# Inventory
+bvapi file list --select id,name,bytes,status --plain
+
+# Rename
+echo '{"name":"pricing-2026-q2"}' | bvapi file update $F1 -f -
+```
+
+See [SKILL.md → Knowledge Bases](../SKILL.md) for the full file → query-tool → assistant pipeline.
+
 ## schema
 
 ```bash
@@ -185,7 +211,7 @@ Returns a map of `NAME → {code, description}`.
 | tool         | Phase 2 ✅    | list, get, create, update, delete |
 | call         | Phase 3 ✅    | list, get, create, update, delete |
 | phone-number | Phase 3 ✅    | list, get, create, update, delete |
-| file         | Phase 4 ⏳    | — |
+| file         | Phase 4 ✅    | list, get, create, update, delete |
 | chat         | Phase 5 ⏳    | — |
 | session      | Phase 5 ⏳    | — |
 | campaign     | Phase 5 ⏳    | — |

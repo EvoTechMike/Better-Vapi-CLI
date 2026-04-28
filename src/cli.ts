@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { buildAssistantCommand } from "./commands/assistant.js";
 import { buildAuthCommand } from "./commands/auth.js";
 import { buildCallCommand } from "./commands/call.js";
+import { buildFileCommand } from "./commands/file.js";
 import { buildPhoneNumberCommand } from "./commands/phone-number.js";
 import { buildSquadCommand } from "./commands/squad.js";
 import { buildToolCommand } from "./commands/tool.js";
@@ -11,7 +12,7 @@ import { addGlobalFlags } from "./global-flags.js";
 import { emit, type GlobalFlags } from "./output.js";
 import { findSubcommand, serializeCommand } from "./schema.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 function buildProgram(): Command {
   const program = new Command();
@@ -38,6 +39,7 @@ function buildProgram(): Command {
   program.addCommand(buildCallCommand());
   program.addCommand(buildPhoneNumberCommand());
   program.addCommand(buildToolCommand());
+  program.addCommand(buildFileCommand());
 
   addGlobalFlags(program.command("schema [path...]"))
     .description(

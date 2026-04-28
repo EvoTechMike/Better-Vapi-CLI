@@ -14,7 +14,7 @@ The Vapi MCP server can't return large payloads (full system prompts, full assis
 | tool         | Phase 2 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | call         | Phase 3 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | phone-number | Phase 3 ✅ | `list`, `get`, `create`, `update`, `delete` |
-| file         | Phase 4 ⏳ | —                                     |
+| file         | Phase 4 ✅ | `list`, `get`, `create`, `update`, `delete` |
 | chat         | Phase 5 ⏳ | —                                     |
 | session      | Phase 5 ⏳ | —                                     |
 | campaign     | Phase 5 ⏳ | —                                     |
@@ -108,6 +108,18 @@ bvapi phone-number get $PHONE | jq '{number, name, assistantId, squadId}'
 # List every tool, then pull one's full function schema
 bvapi tool list --select id,type,function.name --plain
 bvapi tool get $TOOL_ID | jq '.function'
+
+# Build a knowledge base: upload → query tool → wire to assistant
+F1=$(bvapi file create -f ./pricing.pdf | jq -r '.id')
+F2=$(bvapi file create -f ./faq.md      | jq -r '.id')
+TOOL_ID=$(jq -n --arg a "$F1" --arg b "$F2" '{
+  type:"query",
+  function:{name:"product-knowledge", description:"Search product docs and pricing."},
+  knowledgeBases:[{provider:"google", name:"product-kb",
+    description:"Pricing, plans, FAQ.", fileIds:[$a,$b]}]
+}' | bvapi tool create -f - | jq -r '.id')
+# Then `bvapi assistant update $A` with model.toolIds += [$TOOL_ID] and a
+# system prompt that names "product-knowledge" — see SKILL.md for the patch.
 ```
 
 ## Output modes

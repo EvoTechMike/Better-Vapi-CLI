@@ -116,6 +116,7 @@ describe("CLI wiring", () => {
         "call",
         "phone-number",
         "tool",
+        "file",
         "schema",
         "exit-codes",
       ]),
@@ -213,6 +214,61 @@ describe("CLI wiring", () => {
     await expect(run(["tool", "delete", "t1"])).rejects.toThrow("__exit:2");
     expect(fetchMock).not.toHaveBeenCalled();
     delete process.env.VAPI_API_KEY;
+  });
+
+  it("file list --dry-run prints planned GET /file", async () => {
+    await run(["file", "list", "--dry-run", "--json"]);
+    expect(JSON.parse(lastStdout())).toEqual({
+      method: "GET",
+      url: "https://api.vapi.ai/file",
+      body: null,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("file create --dry-run describes the multipart upload", async () => {
+    const tmp = `/tmp/bvapi-test-${Date.now()}.txt`;
+    fs.writeFileSync(tmp, "hello world");
+    try {
+      await run(["file", "create", "-f", tmp, "--dry-run", "--json"]);
+      const planned = JSON.parse(lastStdout()) as {
+        method: string;
+        url: string;
+        body: { multipart: { file: string; name: string; bytes: number } };
+      };
+      expect(planned.method).toBe("POST");
+      expect(planned.url).toBe("https://api.vapi.ai/file");
+      expect(planned.body.multipart.file).toBe(`@${tmp}`);
+      expect(planned.body.multipart.name).toBe(tmp.split("/").pop());
+      expect(planned.body.multipart.bytes).toBe(11);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fs.unlinkSync(tmp);
+    }
+  });
+
+  it("file create posts FormData to /file with bearer auth", async () => {
+    process.env.VAPI_API_KEY = "test-key";
+    const tmp = `/tmp/bvapi-test-${Date.now()}.txt`;
+    fs.writeFileSync(tmp, "hello");
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "f1", name: "x", bytes: 5 }), { status: 200 }),
+    );
+    try {
+      await run(["file", "create", "-f", tmp, "--json"]);
+      expect(fetchMock.mock.calls[0]![0]).toBe("https://api.vapi.ai/file");
+      const init = fetchMock.mock.calls[0]![1] as RequestInit;
+      expect(init.method).toBe("POST");
+      expect(init.body).toBeInstanceOf(FormData);
+      expect(init.headers).toMatchObject({ Authorization: "Bearer test-key" });
+      // Crucial: don't set Content-Type explicitly; fetch must fill in the
+      // multipart boundary itself.
+      expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+      expect(JSON.parse(lastStdout())).toMatchObject({ id: "f1" });
+    } finally {
+      fs.unlinkSync(tmp);
+      delete process.env.VAPI_API_KEY;
+    }
   });
 
   it("schema narrows to a subcommand", async () => {
